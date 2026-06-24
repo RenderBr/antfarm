@@ -419,7 +419,7 @@ function updateInspector(): void {
                       : a.carry === Ant.CARRY_SUPER ? "special food" : "nothing";
   r.energy.style.width = `${Math.round(a.energy)}%`;
   r.health.style.width = `${Math.round(a.hp / a.maxHp * 100)}%`;
-  r.stats.textContent = `Smart ${a.brainScore.toFixed(2)} · Fitness ${a.fitness.toFixed(0)} · Age ${a.age.toFixed(0)}s`;
+  r.stats.textContent = `Neurons ${a.brain.nHid} · Smart ${a.brainScore.toFixed(2)} · Fitness ${a.fitness.toFixed(0)} · Age ${a.age.toFixed(0)}s`;
   const o = a.brain.out;
   const vals = [(o[0] + 1) / 2, o[1], o[2], o[3], o[4], o[5], o[6], o[7], o[8]];
   for (let k = 0; k < 9; k++) {
