@@ -342,38 +342,89 @@ function fmtTime(t: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+const BRAIN_OUTPUT_COLORS = ["#8fd", "#fd8", "#c96", "#fb8", "#9f8", "#f99", "#6f9", "#f6c", "#fe9"];
+const BRAIN_OUTPUT_LABELS = ["turn", "move", "dig", "build", "grab", "drop", "food trail", "home trail", "eat"];
+
+interface InsRefs {
+  dot: HTMLElement;
+  id: HTMLElement;
+  colony: HTMLElement;
+  lastact: HTMLElement;
+  carry: HTMLElement;
+  energy: HTMLElement;
+  health: HTMLElement;
+  stats: HTMLElement;
+  brainBars: HTMLElement[];
+}
+
+let insBuilt = false;
+let insSelectedId: number | null = null;
+let insRefs: InsRefs | null = null;
+
+function buildInspectorSkeleton(): void {
+  const bars = BRAIN_OUTPUT_LABELS.map((label, k) =>
+    `<label>${label} <span class="obar"><i class="ins-o${k}" style="background:${BRAIN_OUTPUT_COLORS[k]}"></i></span></label>`
+  ).join("");
+  ui.inspector.innerHTML = `
+      <h2>Inspector</h2>
+      <div class="name"><span class="dot ins-dot"></span><span class="ins-id"></span> <small class="ins-colony"></small></div>
+      <p class="ins-action"><strong class="ins-lastact"></strong> · carrying <span class="ins-carry"></span></p>
+      <p>Energy</p><div class="bar"><i class="ins-energy"></i></div>
+      <p>Health</p><div class="bar health"><i class="ins-health"></i></div>
+      <p class="ins-stats"></p>
+      <details class="brain-details">
+        <summary>Brain outputs</summary>
+        <div class="brainout">${bars}</div>
+      </details>`;
+  const root = ui.inspector;
+  insRefs = {
+    dot: root.querySelector<HTMLElement>(".ins-dot")!,
+    id: root.querySelector<HTMLElement>(".ins-id")!,
+    colony: root.querySelector<HTMLElement>(".ins-colony")!,
+    lastact: root.querySelector<HTMLElement>(".ins-lastact")!,
+    carry: root.querySelector<HTMLElement>(".ins-carry")!,
+    energy: root.querySelector<HTMLElement>(".ins-energy")!,
+    health: root.querySelector<HTMLElement>(".ins-health")!,
+    stats: root.querySelector<HTMLElement>(".ins-stats")!,
+    brainBars: Array.from({ length: 9 }, (_, k) => root.querySelector<HTMLElement>(`.ins-o${k}`)!),
+  };
+  insBuilt = true;
+}
+
+function showInspectorEmpty(): void {
+  ui.inspector.innerHTML = `<h2>Inspector</h2><p>Click an ant for details.</p>`;
+  insBuilt = false;
+  insRefs = null;
+  insSelectedId = null;
+}
+
 function updateInspector(): void {
   if (!selected || !selected.alive) {
-    ui.inspector.innerHTML = `<h2>Inspector</h2><p>Click an ant for details.</p>`;
+    if (insBuilt || insSelectedId !== null) showInspectorEmpty();
     return;
   }
   const a = selected;
+  if (!insBuilt || insSelectedId !== a.id) {
+    buildInspectorSkeleton();
+    insSelectedId = a.id;
+  }
+  const r = insRefs!;
+  r.dot.style.background = a.colony.color;
+  r.id.textContent = `Ant #${a.id}`;
+  r.colony.textContent = a.colony.name;
+  r.colony.style.color = a.colony.color;
+  r.lastact.textContent = a.lastAction;
+  r.carry.textContent = a.carry === Ant.CARRY_FOOD ? "food"
+                      : a.carry === Ant.CARRY_SOIL ? "soil"
+                      : a.carry === Ant.CARRY_SUPER ? "special food" : "nothing";
+  r.energy.style.width = `${Math.round(a.energy)}%`;
+  r.health.style.width = `${Math.round(a.hp / a.maxHp * 100)}%`;
+  r.stats.textContent = `Smart ${a.brainScore.toFixed(2)} · Fitness ${a.fitness.toFixed(0)} · Age ${a.age.toFixed(0)}s`;
   const o = a.brain.out;
-  const bar = (v: number, col: string) => `<div class="obar"><i style="width:${Math.round(Math.max(0, v) * 100)}%;background:${col}"></i></div>`;
-  const carry = a.carry === Ant.CARRY_FOOD ? "food"
-              : a.carry === Ant.CARRY_SOIL ? "soil"
-              : a.carry === Ant.CARRY_SUPER ? "special food" : "nothing";
-  ui.inspector.innerHTML = `
-      <h2>Inspector</h2>
-      <div class="name"><span class="dot" style="background:${a.colony.color}"></span>Ant #${a.id} <small style="color:${a.colony.color}">${a.colony.name}</small></div>
-      <p><strong>${a.lastAction}</strong> · carrying ${carry}</p>
-      <p>Energy</p><div class="bar"><i style="width:${Math.round(a.energy)}%"></i></div>
-      <p>Health</p><div class="bar health"><i style="width:${Math.round(a.hp / a.maxHp * 100)}%"></i></div>
-      <p>Smart ${a.brainScore.toFixed(2)} · Fitness ${a.fitness.toFixed(0)} · Age ${a.age.toFixed(0)}s</p>
-      <details class="brain-details">
-        <summary>Brain outputs</summary>
-        <div class="brainout">
-          <label>turn ${bar((o[0] + 1) / 2, "#8fd")}</label>
-          <label>move ${bar(o[1], "#fd8")}</label>
-          <label>dig ${bar(o[2], "#c96")}</label>
-          <label>build ${bar(o[3], "#fb8")}</label>
-          <label>grab ${bar(o[4], "#9f8")}</label>
-          <label>drop ${bar(o[5], "#f99")}</label>
-          <label>food trail ${bar(o[6], "#6f9")}</label>
-          <label>home trail ${bar(o[7], "#f6c")}</label>
-          <label>eat ${bar(o[8], "#fe9")}</label>
-        </div>
-      </details>`;
+  const vals = [(o[0] + 1) / 2, o[1], o[2], o[3], o[4], o[5], o[6], o[7], o[8]];
+  for (let k = 0; k < 9; k++) {
+    r.brainBars[k].style.width = `${Math.round(Math.max(0, Math.min(1, vals[k])) * 100)}%`;
+  }
 }
 
 function updateLeaderboard(): void {

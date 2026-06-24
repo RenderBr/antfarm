@@ -64,14 +64,6 @@
         </div>
       </section>
 
-      <section class="leaderboard panel-card">
-        <div class="lbtabs flex gap-1.5 mb-2">
-          <button id="tabLive" class="lbtab tool-btn active flex-1 !py-1.5 text-xs" aria-pressed="true">Smartest live</button>
-          <button id="tabFame" class="lbtab tool-btn flex-1 !py-1.5 text-xs" aria-pressed="false">Smartest ever</button>
-        </div>
-        <div id="leaderboard"></div>
-      </section>
-
       <section class="inspector panel-card text-[13px] leading-relaxed" id="inspector"></section>
 
       <details class="legend panel-card">
@@ -81,6 +73,15 @@
           <li>Food grows colonies; successful ants shape the next generation.</li>
           <li><b class="text-[var(--color-text)] font-semibold">Smart</b> ranks brains by how varied their action signals are — richer, more diverse brain activity scores higher.</li>
         </ul>
+      </details>
+
+      <details class="leaderboard panel-card" open>
+        <summary>Smartest</summary>
+        <div class="lbtabs flex gap-1.5 mb-2">
+          <button id="tabLive" class="lbtab tool-btn active flex-1 !py-1.5 text-xs" aria-pressed="true">Smartest live</button>
+          <button id="tabFame" class="lbtab tool-btn flex-1 !py-1.5 text-xs" aria-pressed="false">Smartest ever</button>
+        </div>
+        <div id="leaderboard"></div>
       </details>
     </aside>
   </main>

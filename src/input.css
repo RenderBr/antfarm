@@ -73,6 +73,18 @@ input[type="range"] { accent-color: var(--color-accent); }
 .ev.evnone { color: var(--color-muted); background: none; }
 
 /* ---------- leaderboard rows ---------- */
+.leaderboard > summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  user-select: none;
+  margin-bottom: 9px;
+}
+.leaderboard > summary::marker { color: var(--color-muted); }
+.leaderboard > summary::-webkit-details-marker { color: var(--color-muted); }
 .lbrow { display: grid; grid-template-columns: 22px minmax(0,1fr) auto; align-items: center; gap: 8px;
   padding: 6px 8px; border-radius: 7px; cursor: pointer; transition: background .12s; }
 .lbrow:hover, .lbrow:focus-visible { background: rgba(255,255,255,0.04); outline: none; }
