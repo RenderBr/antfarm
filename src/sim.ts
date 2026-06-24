@@ -63,7 +63,7 @@ class SpatialHash {
 
 export interface GenePoolEntry { genome: Genome; fitness: number; traits: Traits; gen: number; }
 export interface Champion {
-  id: number; fitness: number; foodDelivered: number;
+  id: number; fitness: number; brainScore: number; foodDelivered: number;
   soilMoved: number; kills: number; age: number; gen: number;
   colony: string; color: string;
   traits: Traits;
@@ -394,16 +394,16 @@ export class Simulation {
 
   recordChampion(ant: Ant): void {
     const snap: Champion = {
-      id: ant.id, fitness: ant.fitness, foodDelivered: ant.foodDelivered,
+      id: ant.id, fitness: ant.fitness, brainScore: ant.brainScore, foodDelivered: ant.foodDelivered,
       soilMoved: ant.soilMoved, kills: ant.kills, age: ant.age, gen: ant.bornGen || 1,
       colony: ant.colony.name, color: ant.colony.color,
       traits: { size: ant.traits.size, speed: ant.traits.speed, smarts: ant.traits.smarts },
     };
     const ex = this.hallOfFame.find(h => h.id === ant.id);
-    if (ex) { if (snap.fitness > ex.fitness) Object.assign(ex, snap); }
-    else if (this.hallOfFame.length < 12 || snap.fitness > this.hallOfFame[this.hallOfFame.length - 1].fitness)
+    if (ex) { if (snap.brainScore > ex.brainScore) Object.assign(ex, snap); }
+    else if (this.hallOfFame.length < 12 || snap.brainScore > this.hallOfFame[this.hallOfFame.length - 1].brainScore)
       this.hallOfFame.push(snap);
-    this.hallOfFame.sort((a, b) => b.fitness - a.fitness);
+    this.hallOfFame.sort((a, b) => b.brainScore - a.brainScore);
     if (this.hallOfFame.length > 12) this.hallOfFame.length = 12;
   }
 

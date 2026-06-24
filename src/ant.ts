@@ -10,6 +10,8 @@ export const CARRY_NONE = 0, CARRY_FOOD = 1, CARRY_SOIL = 2, CARRY_SUPER = 3;
 export type Carry = 0 | 1 | 2 | 3;
 
 const SENSE_ANGLES = [-0.7, 0, 0.7];
+const N_OUT = 9;
+const BRAIN_SAMPLES = 24;
 let NEXT_ID = 1;
 
 function clamp(v: number, a: number, b: number): number { return v < a ? a : v > b ? b : v; }
@@ -83,11 +85,16 @@ export class Ant {
   damageDealt: number;
   kills: number;
   fitness: number;
+  brainScore: number;
   superDelivered?: number;
   killedBySpider?: boolean;
 
   private _osc: number;
   _in: Float32Array;
+  private _brainBuf: Float32Array;
+  private _brainCount: number;
+  private _brainIdx: number;
+  private _brainTick: number;
   lastAction: string;
   actCool: number;
   bornGen: number;
@@ -122,9 +129,14 @@ export class Ant {
     this.damageDealt = 0;
     this.kills = 0;
     this.fitness = 0;
+    this.brainScore = 0;
 
     this._osc = Math.random() * Math.PI * 2;
     this._in = new Float32Array(N_IN);
+    this._brainBuf = new Float32Array(BRAIN_SAMPLES * N_OUT);
+    this._brainCount = 0;
+    this._brainIdx = 0;
+    this._brainTick = 0;
     this.lastAction = "wander";
     this.actCool = 0;
     this.bornGen = 1;
@@ -191,6 +203,24 @@ export class Ant {
     return inp;
   }
 
+  private _computeBrainScore(): number {
+    const n = this._brainCount;
+    if (n < 2) return 0;
+    const bb = this._brainBuf;
+    let sumStd = 0;
+    for (let j = 0; j < N_OUT; j++) {
+      let sum = 0, sumsq = 0;
+      for (let s = 0; s < n; s++) {
+        const v = bb[s * N_OUT + j];
+        sum += v; sumsq += v * v;
+      }
+      const mean = sum / n;
+      const variance = Math.max(0, sumsq / n - mean * mean);
+      sumStd += Math.sqrt(variance);
+    }
+    return sumStd / N_OUT;
+  }
+
   update(dt: number): void {
     if (!this.alive) return;
     const w = this.world;
@@ -199,6 +229,13 @@ export class Ant {
     this.actCool -= dt;
 
     const o = this.brain.forward(this.sense());
+
+    const wi = this._brainIdx * N_OUT;
+    for (let k = 0; k < N_OUT; k++) this._brainBuf[wi + k] = o[k];
+    this._brainIdx = (this._brainIdx + 1) % BRAIN_SAMPLES;
+    if (this._brainCount < BRAIN_SAMPLES) this._brainCount++;
+    if (++this._brainTick >= 5) { this._brainTick = 0; this.brainScore = this._computeBrainScore(); }
+
     this.heading += o[0] * 3.2 * dt;
     const throttle = Math.max(0, o[1]);
     const speed = this.maxSpeed * throttle;

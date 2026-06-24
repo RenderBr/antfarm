@@ -350,7 +350,7 @@ function updateInspector(): void {
       <p><strong>${a.lastAction}</strong> · carrying ${carry}</p>
       <p>Energy</p><div class="bar"><i style="width:${Math.round(a.energy)}%"></i></div>
       <p>Health</p><div class="bar health"><i style="width:${Math.round(a.hp / a.maxHp * 100)}%"></i></div>
-      <p>Fitness ${a.fitness.toFixed(1)} · Age ${a.age.toFixed(0)}s</p>
+      <p>Smart ${a.brainScore.toFixed(2)} · Fitness ${a.fitness.toFixed(0)} · Age ${a.age.toFixed(0)}s</p>
       <details class="brain-details">
         <summary>Brain outputs</summary>
         <div class="brainout">
@@ -370,7 +370,7 @@ function updateInspector(): void {
 function updateLeaderboard(): void {
   let rows = "";
   if (lbTab === "live") {
-    const top = sim.ants.slice().sort((a, b) => b.fitness - a.fitness).slice(0, 8);
+    const top = sim.ants.slice().sort((a, b) => b.brainScore - a.brainScore).slice(0, 8);
     if (!top.length) rows = `<p class="lbempty">No ants alive.</p>`;
     top.forEach((a, i) => {
       const sel = a === selected ? " sel" : "";
@@ -378,7 +378,7 @@ function updateLeaderboard(): void {
       rows += `<div class="lbrow${sel}" data-id="${a.id}" role="button" tabindex="0">
           <span class="rank" style="color:${a.colony.color}">${i + 1}</span>
           <span class="who"><span class="dot" style="background:${a.colony.color}"></span>Ant #${a.id}<small>${a.colony.name} · ${tr}</small></span>
-          <span class="fit">${a.fitness.toFixed(0)}<small>${a.foodDelivered.toFixed(1)} food</small></span>
+          <span class="fit">${a.brainScore.toFixed(2)}<small>${a.foodDelivered.toFixed(1)} food</small></span>
         </div>`;
     });
   } else {
@@ -390,7 +390,7 @@ function updateLeaderboard(): void {
       rows += `<div class="lbrow" data-id="${h.id}" ${live ? 'role="button" tabindex="0"' : 'aria-disabled="true"'}>
           <span class="rank" style="color:${h.color}">${i + 1}</span>
           <span class="who"><span class="dot" style="background:${h.color}"></span>Ant #${h.id}${live ? " live" : ""}<small>${h.colony} · ${tr}</small></span>
-          <span class="fit">${h.fitness.toFixed(0)}<small>${h.foodDelivered.toFixed(1)} food</small></span>
+          <span class="fit">${h.brainScore.toFixed(2)}<small>${h.foodDelivered.toFixed(1)} food</small></span>
         </div>`;
     });
   }
