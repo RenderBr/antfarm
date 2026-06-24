@@ -76,11 +76,15 @@
       </details>
 
       <details class="leaderboard panel-card" open>
-        <summary>Smartest</summary>
-        <div class="lbtabs flex gap-1.5 mb-2">
-          <button id="tabLive" class="lbtab tool-btn active flex-1 !py-1.5 text-xs" aria-pressed="true">Smartest live</button>
-          <button id="tabFame" class="lbtab tool-btn flex-1 !py-1.5 text-xs" aria-pressed="false">Smartest ever</button>
-        </div>
+        <summary>Leaderboard</summary>
+        <select id="lbCategory" class="lb-cat" aria-label="Leaderboard category">
+          <option value="smart">Smartest</option>
+          <option value="food">Most food</option>
+          <option value="soil">Most soil</option>
+          <option value="kills">Most kills</option>
+          <option value="age">Oldest</option>
+          <option value="fitness">Most fit</option>
+        </select>
         <div id="leaderboard"></div>
       </details>
     </aside>

@@ -85,6 +85,37 @@ input[type="range"] { accent-color: var(--color-accent); }
 }
 .leaderboard > summary::marker { color: var(--color-muted); }
 .leaderboard > summary::-webkit-details-marker { color: var(--color-muted); }
+.leaderboard select.lb-cat {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 7px 30px 7px 11px;
+  margin-bottom: 9px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: rgba(255,255,255,0.03);
+  color: var(--color-text);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 5l3 3 3-3' fill='none' stroke='%239f9588' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px;
+  transition: background-color .12s, border-color .12s;
+}
+.leaderboard select.lb-cat:hover {
+  background-color: rgba(255,255,255,0.06);
+  border-color: #5a4c3d;
+}
+.leaderboard select.lb-cat:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.leaderboard select.lb-cat option {
+  background: var(--color-panel);
+  color: var(--color-text);
+}
 .lbrow { display: grid; grid-template-columns: 22px minmax(0,1fr) auto; align-items: center; gap: 8px;
   padding: 6px 8px; border-radius: 7px; cursor: pointer; transition: background .12s; }
 .lbrow:hover, .lbrow:focus-visible { background: rgba(255,255,255,0.04); outline: none; }

@@ -21,8 +21,7 @@ const ui = {
   tools: document.querySelectorAll<HTMLButtonElement>(".tool"),
   brush: document.getElementById("brush") as HTMLInputElement,
   leaderboard: document.getElementById("leaderboard")!,
-  tabLive: document.getElementById("tabLive")!,
-  tabFame: document.getElementById("tabFame")!,
+  lbCategory: document.getElementById("lbCategory") as HTMLSelectElement,
   colonies: document.getElementById("colonies")!,
   eventlog: document.getElementById("eventlog")!,
 };
@@ -35,7 +34,7 @@ let paused = false;
 let showPher = true;
 let showVision = false;
 let selected: Ant | null = null;
-let lbTab: "live" | "fame" = "live";
+let lbTimer = 0;
 
 // ---------- camera ----------
 const cam = { x: 0, y: 0, zoom: 1 };
@@ -427,34 +426,139 @@ function updateInspector(): void {
   }
 }
 
-function updateLeaderboard(): void {
-  let rows = "";
-  if (lbTab === "live") {
-    const top = sim.ants.slice().sort((a, b) => b.brainScore - a.brainScore).slice(0, 8);
-    if (!top.length) rows = `<p class="lbempty">No ants alive.</p>`;
-    top.forEach((a, i) => {
-      const sel = a === selected ? " sel" : "";
-      const tr = `size ${a.traits.size.toFixed(1)} · speed ${a.traits.speed.toFixed(1)} · sense ${a.traits.smarts.toFixed(1)}`;
-      rows += `<div class="lbrow${sel}" data-id="${a.id}" role="button" tabindex="0">
-          <span class="rank" style="color:${a.colony.color}">${i + 1}</span>
-          <span class="who"><span class="dot" style="background:${a.colony.color}"></span>Ant #${a.id}<small>${a.colony.name} · ${tr}</small></span>
-          <span class="fit">${a.brainScore.toFixed(2)}<small>${a.foodDelivered.toFixed(1)} food</small></span>
-        </div>`;
-    });
-  } else {
-    const top = sim.hallOfFame;
-    if (!top.length) rows = `<p class="lbempty">No champions yet.</p>`;
-    top.forEach((h, i) => {
-      const live = sim.ants.some(a => a.id === h.id);
-      const tr = `size ${h.traits.size.toFixed(1)} · speed ${h.traits.speed.toFixed(1)} · sense ${h.traits.smarts.toFixed(1)}`;
-      rows += `<div class="lbrow" data-id="${h.id}" ${live ? 'role="button" tabindex="0"' : 'aria-disabled="true"'}>
-          <span class="rank" style="color:${h.color}">${i + 1}</span>
-          <span class="who"><span class="dot" style="background:${h.color}"></span>Ant #${h.id}${live ? " live" : ""}<small>${h.colony} · ${tr}</small></span>
-          <span class="fit">${h.brainScore.toFixed(2)}<small>${h.foodDelivered.toFixed(1)} food</small></span>
-        </div>`;
+interface LbEntry {
+  id: number;
+  colony: string;
+  color: string;
+  traits: { size: number; speed: number; smarts: number };
+  brainScore: number;
+  fitness: number;
+  foodDelivered: number;
+  soilMoved: number;
+  kills: number;
+  age: number;
+  gen: number;
+  live: boolean;
+}
+
+interface LbCategory {
+  key: string;
+  score: (e: LbEntry) => number;
+  fmt: (e: LbEntry) => string;
+  small: (e: LbEntry) => string;
+}
+
+const LB_CATEGORIES: LbCategory[] = [
+  { key: "smart",   score: e => e.brainScore,    fmt: e => e.brainScore.toFixed(2),    small: e => `${e.foodDelivered.toFixed(1)} food` },
+  { key: "food",    score: e => e.foodDelivered, fmt: e => e.foodDelivered.toFixed(1), small: e => `${e.brainScore.toFixed(2)} smart` },
+  { key: "soil",    score: e => e.soilMoved,     fmt: e => e.soilMoved.toString(),     small: e => `${e.foodDelivered.toFixed(1)} food` },
+  { key: "kills",   score: e => e.kills,         fmt: e => e.kills.toString(),         small: e => `${e.foodDelivered.toFixed(1)} food` },
+  { key: "age",     score: e => e.age,           fmt: e => `${e.age.toFixed(0)}s`,     small: e => `${e.foodDelivered.toFixed(1)} food` },
+  { key: "fitness", score: e => e.fitness,       fmt: e => e.fitness.toFixed(0),      small: e => `${e.foodDelivered.toFixed(1)} food` },
+];
+
+interface LbRowRefs {
+  row: HTMLElement;
+  rank: HTMLElement;
+  id: HTMLElement;
+  small: HTMLElement;
+  score: HTMLElement;
+  scoreSmall: HTMLElement;
+  idNum: number;
+}
+
+let lbBuilt = false;
+let lbEmpty = false;
+let lbRows: LbRowRefs[] = [];
+
+function buildLbRows(): void {
+  ui.leaderboard.innerHTML = "";
+  lbRows = [];
+  for (let i = 0; i < 8; i++) {
+    const row = document.createElement("div");
+    row.className = "lbrow";
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.innerHTML = `
+      <span class="rank"></span>
+      <span class="who"><span class="who-id"></span><small class="who-small"></small></span>
+      <span class="fit"><span class="fit-score"></span><small class="fit-small"></small></span>
+    `;
+    ui.leaderboard.appendChild(row);
+    lbRows.push({
+      row,
+      rank: row.querySelector<HTMLElement>(".rank")!,
+      id: row.querySelector<HTMLElement>(".who-id")!,
+      small: row.querySelector<HTMLElement>(".who-small")!,
+      score: row.querySelector<HTMLElement>(".fit-score")!,
+      scoreSmall: row.querySelector<HTMLElement>(".fit-small")!,
+      idNum: -1,
     });
   }
-  ui.leaderboard.innerHTML = rows;
+  lbBuilt = true;
+  lbEmpty = false;
+}
+
+function showLbEmpty(): void {
+  ui.leaderboard.innerHTML = `<p class="lbempty">No ants yet.</p>`;
+  lbBuilt = false;
+  lbEmpty = true;
+  lbRows = [];
+}
+
+function updateLeaderboard(): void {
+  const cat = LB_CATEGORIES.find(c => c.key === ui.lbCategory.value) || LB_CATEGORIES[0];
+
+  const map = new Map<number, LbEntry>();
+  for (const a of sim.ants) {
+    if (!a.alive) continue;
+    map.set(a.id, {
+      id: a.id, colony: a.colony.name, color: a.colony.color,
+      traits: { size: a.traits.size, speed: a.traits.speed, smarts: a.traits.smarts },
+      brainScore: a.brainScore, fitness: a.fitness, foodDelivered: a.foodDelivered,
+      soilMoved: a.soilMoved, kills: a.kills, age: a.age, gen: a.bornGen || 1, live: true,
+    });
+  }
+  for (const h of sim.hallOfFame) {
+    if (map.has(h.id)) continue;
+    map.set(h.id, {
+      id: h.id, colony: h.colony, color: h.color,
+      traits: { size: h.traits.size, speed: h.traits.speed, smarts: h.traits.smarts },
+      brainScore: h.brainScore, fitness: h.fitness, foodDelivered: h.foodDelivered,
+      soilMoved: h.soilMoved, kills: h.kills, age: h.age, gen: h.gen, live: false,
+    });
+  }
+  const entries = Array.from(map.values());
+  entries.sort((a, b) => cat.score(b) - cat.score(a));
+  const top = entries.slice(0, 8);
+
+  if (top.length === 0) {
+    if (!lbEmpty) showLbEmpty();
+    return;
+  }
+  if (!lbBuilt) buildLbRows();
+
+  const selId = selected ? selected.id : -1;
+  for (let i = 0; i < lbRows.length; i++) {
+    const r = lbRows[i];
+    const e = top[i];
+    if (!e) {
+      if (r.row.style.display !== "none") r.row.style.display = "none";
+      continue;
+    }
+    r.row.style.display = "";
+    r.idNum = e.id;
+    r.row.dataset.id = String(e.id);
+    r.rank.textContent = String(i + 1);
+    r.rank.style.color = e.color;
+    r.id.textContent = `Ant #${e.id}`;
+    r.small.textContent = `${e.colony} · size ${e.traits.size.toFixed(1)} · speed ${e.traits.speed.toFixed(1)} · sense ${e.traits.smarts.toFixed(1)}`;
+    r.score.textContent = cat.fmt(e);
+    r.scoreSmall.textContent = cat.small(e);
+    r.row.classList.toggle("sel", e.id === selId);
+    if (e.live) r.row.removeAttribute("aria-disabled");
+    else r.row.setAttribute("aria-disabled", "true");
+  }
 }
 
 function selectLeaderboardRow(row: HTMLElement): void {
@@ -480,16 +584,7 @@ ui.leaderboard.addEventListener("keydown", e => {
   e.preventDefault();
   selectLeaderboardRow(row as HTMLElement);
 });
-ui.tabLive.addEventListener("click", () => {
-  lbTab = "live";
-  ui.tabLive.classList.add("active"); ui.tabLive.setAttribute("aria-pressed", "true");
-  ui.tabFame.classList.remove("active"); ui.tabFame.setAttribute("aria-pressed", "false");
-  updateLeaderboard();
-});
-ui.tabFame.addEventListener("click", () => {
-  lbTab = "fame";
-  ui.tabFame.classList.add("active"); ui.tabFame.setAttribute("aria-pressed", "true");
-  ui.tabLive.classList.remove("active"); ui.tabLive.setAttribute("aria-pressed", "false");
+ui.lbCategory.addEventListener("change", () => {
   updateLeaderboard();
 });
 
@@ -615,7 +710,9 @@ function loop(now: number): void {
   draw();
 
   statTimer -= dt;
-  if (statTimer <= 0) { updateStats(); updateInspector(); updateLeaderboard(); statTimer = 0.2; }
+  if (statTimer <= 0) { updateStats(); updateInspector(); statTimer = 0.2; }
+  lbTimer -= dt;
+  if (lbTimer <= 0) { updateLeaderboard(); lbTimer = 1.0; }
 
   requestAnimationFrame(loop);
 }
