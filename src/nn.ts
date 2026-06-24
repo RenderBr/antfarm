@@ -1,17 +1,16 @@
 /* nn.ts — tiny evolvable feed-forward neural network.
  * Each ant carries one of these as its "brain". No backprop:
  * brains improve over generations through selection + mutation (a genetic algorithm).
- * Most brains have DEFAULT_NEURONS hidden neurons; a tiny fraction (SUPER_CHANCE)
- * are "super brains" with SUPER_NEURONS — a much richer architecture that can do
- * more with the same 32 inputs and 9 outputs.
+ * Hidden-layer size is a random integer in [MIN_NEURONS, MAX_NEURONS], so the
+ * population covers everything from minimal to highly expressive networks while
+ * sharing the same 32 inputs and 9 outputs.
  */
 
 export const N_IN = 32;   // sensory inputs (terrain, threats, super-food)
 export const N_OUT = 9;   // action outputs
 
-export const DEFAULT_NEURONS = 18;
-export const SUPER_NEURONS = 300;
-export const SUPER_CHANCE = 1 / 400;
+export const MIN_NEURONS = 18;
+export const MAX_NEURONS = 300;
 
 function randn(): number {
   // Box-Muller
@@ -29,7 +28,7 @@ function genomeSize(nHid: number): number {
 
 export function randomGenome(nHid?: number): Genome {
   if (nHid === undefined) {
-    nHid = Math.random() < SUPER_CHANCE ? SUPER_NEURONS : DEFAULT_NEURONS;
+    nHid = MIN_NEURONS + Math.floor(Math.random() * (MAX_NEURONS - MIN_NEURONS + 1));
   }
   const g = new Float32Array(genomeSize(nHid));
   for (let i = 0; i < g.length; i++) g[i] = randn() * 0.7;
@@ -69,10 +68,6 @@ function tanh(x: number): number {
 
 export function nHidFromGenome(len: number): number {
   return Math.round((len - N_OUT) / (N_IN + 1 + N_OUT));
-}
-
-export function isSuper(b: { nHid: number }): boolean {
-  return b.nHid > DEFAULT_NEURONS;
 }
 
 export class Brain {

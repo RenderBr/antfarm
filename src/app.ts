@@ -3,7 +3,6 @@
 import { GROUND, DIRT, WALL, NEST, ROCK, CS, isSolid, World } from "./world.js";
 import { Simulation } from "./sim.js";
 import { Ant } from "./ant.js";
-import { isSuper } from "./nn.js";
 
 const canvas = document.getElementById("farm") as HTMLCanvasElement;
 if (!canvas) throw new Error("canvas #farm not found");
@@ -227,14 +226,6 @@ function drawSuperFood(): void {
 function drawAnts(): void {
   for (const a of sim.ants) {
     const r = Math.max(1.4, CS * 0.42 * a.traits.size);
-    const super_ = isSuper(a.brain);
-    if (super_) {
-      const grad = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, r * 3.2);
-      grad.addColorStop(0, "rgba(120,230,210,0.55)");
-      grad.addColorStop(1, "rgba(120,230,210,0)");
-      ctx.fillStyle = grad;
-      ctx.beginPath(); ctx.arc(a.x, a.y, r * 3.2, 0, Math.PI * 2); ctx.fill();
-    }
     const cargo = a.carry === Ant.CARRY_FOOD ? "#7CFF6B"
                 : a.carry === Ant.CARRY_SOIL ? "#C8965A"
                 : a.carry === Ant.CARRY_SUPER ? "#ffd84a" : null;
@@ -242,7 +233,7 @@ function drawAnts(): void {
     ctx.beginPath();
     ctx.ellipse(a.x, a.y, r * 1.5, r * 0.95, a.heading, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = a === selected ? "#ffe27a" : (super_ ? "#e8fff7" : (cargo || "#1a1411"));
+    ctx.fillStyle = a === selected ? "#ffe27a" : (cargo || "#1a1411");
     ctx.beginPath();
     ctx.arc(a.x + Math.cos(a.heading) * r * 1.4, a.y + Math.sin(a.heading) * r * 1.4, r * 0.72, 0, Math.PI * 2);
     ctx.fill();
