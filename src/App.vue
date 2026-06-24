@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import Stage from "./components/Stage.vue";
-import StatsPanel from "./components/StatsPanel.vue";
 import ColoniesPanel from "./components/ColoniesPanel.vue";
 import ControlsPanel from "./components/ControlsPanel.vue";
 import InspectorPanel from "./components/InspectorPanel.vue";

@@ -6,7 +6,8 @@
 
 import { CS, isSolid, GROUND, DIRT, WALL, NEST, ROCK, World } from "./world.js";
 import * as NN from "./nn.js";
-import { Ant, type Colony as ColonyIface, type Traits, randomTraits, breedTraits, type Genome } from "./ant.js";
+import type { Genome } from "./nn.js";
+import { Ant, type Colony as ColonyIface, type Traits, randomTraits, breedTraits } from "./ant.js";
 import { Spider, type SpiderGenes } from "./spider.js";
 import { Worm } from "./worm.js";
 

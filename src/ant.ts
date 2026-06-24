@@ -4,7 +4,8 @@
  */
 
 import { GROUND, DIRT, WALL, NEST, ROCK, CS, isSolid, World } from "./world.js";
-import { N_IN, Brain, Genome } from "./nn.js";
+import { N_IN, Brain } from "./nn.js";
+import type { Genome } from "./nn.js";
 
 export const CARRY_NONE = 0, CARRY_FOOD = 1, CARRY_SOIL = 2, CARRY_SUPER = 3;
 export type Carry = 0 | 1 | 2 | 3;
@@ -324,5 +325,3 @@ Ant.CARRY_SUPER = CARRY_SUPER;
 Ant.randomTraits = randomTraits;
 Ant.breedTraits = breedTraits;
 void ROCK; void NEST;
-// re-export for convenience
-export type { Genome };

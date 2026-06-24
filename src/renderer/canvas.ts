@@ -7,8 +7,7 @@
  */
 
 import {
-  GROUND, DIRT, WALL, NEST, ROCK, CS, isSolid,
-  type World,
+  GROUND, DIRT, WALL, NEST, ROCK, CS, isSolid, World,
 } from "../world.js";
 import { Simulation } from "../sim.js";
 import { Ant, CARRY_FOOD, CARRY_SOIL, CARRY_SUPER } from "../ant.js";
