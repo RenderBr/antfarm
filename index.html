@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Neural Ant Farm</title>
+  <link rel="stylesheet" href="./dist/app.css" />
+</head>
+<body class="m-0 h-full overflow-hidden bg-[var(--color-bg)] text-[var(--color-text)] font-sans text-sm">
+  <main class="grid h-screen p-3 gap-3 [grid-template-columns:minmax(0,1fr)_340px] max-[980px]:[grid-template-columns:1fr] max-[980px]:h-auto max-[980px]:min-h-screen">
+
+    <section class="relative min-w-0 min-h-0 rounded-xl overflow-hidden border border-[var(--color-border)] bg-[#0a0807] max-[980px]:h-[66vh] max-[980px]:min-h-[440px]">
+      <canvas id="farm" role="img" aria-label="Ant farm simulation canvas. Scroll to zoom, drag to pan, and use the toolbar to edit the world."
+              class="block w-full h-full cursor-grab"></canvas>
+
+      <div class="toolbar absolute left-3 top-3 flex flex-wrap gap-1.5 items-center p-1.5 rounded-xl
+                  bg-[color:rgba(16,12,8,0.85)] backdrop-blur-sm border border-[var(--color-border)]">
+        <button class="tool tool-btn active" data-tool="inspect" aria-pressed="true" title="Click an ant to inspect; drag to pan">Inspect</button>
+        <button class="tool tool-btn" data-tool="food" aria-pressed="false" title="Paint food">Food</button>
+        <button class="tool tool-btn" data-tool="dirt" aria-pressed="false" title="Paint diggable dirt">Dirt</button>
+        <button class="tool tool-btn" data-tool="wall" aria-pressed="false" title="Paint walls">Wall</button>
+        <button class="tool tool-btn" data-tool="erase" aria-pressed="false" title="Clear to open ground">Erase</button>
+        <button class="tool tool-btn" data-tool="spider" aria-pressed="false" title="Release a spider where you click">Spider</button>
+        <label class="brushlbl flex items-center gap-1.5 pl-2 text-xs text-[var(--color-muted)]" title="Brush size">
+          <input id="brush" type="range" min="0" max="6" step="1" value="2" class="w-20" />
+        </label>
+      </div>
+
+      <div class="hint absolute left-3 bottom-3 px-3 py-1.5 rounded-full text-xs text-[var(--color-muted)]
+                  bg-[color:rgba(16,12,8,0.8)] border border-[var(--color-border)] pointer-events-none">
+        Scroll to zoom · drag to pan · Inspect an ant or pick a tool to edit
+      </div>
+    </section>
+
+    <aside class="panel panel-scroll flex flex-col gap-3.5 min-h-0 p-4 overflow-auto
+                   rounded-xl border border-[var(--color-border)] bg-[var(--color-panel)]
+                   max-[980px]:overflow-visible">
+      <header class="mb-1">
+        <h1 class="m-0 text-[22px] font-semibold tracking-tight">Neural Ant Farm</h1>
+        <p class="mt-1 text-[13px] leading-snug text-[var(--color-muted)]">Colonies forage, build, and evolve in real time.</p>
+      </header>
+
+      <div class="stats grid grid-cols-2 gap-2" id="stats"></div>
+
+      <section class="colonies-panel panel-card">
+        <h2 class="m-0 mb-2 text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider">Colonies</h2>
+        <div id="colonies"></div>
+        <h2 class="evhead m-0 mt-4 mb-1 text-xs font-semibold text-[var(--color-muted)] uppercase tracking-wider">Events</h2>
+        <div id="eventlog"></div>
+      </section>
+
+      <section class="controls panel-card grid gap-2.5">
+        <label class="row flex items-center justify-between gap-2.5 text-[13px]">
+          Speed <span id="speedVal" class="tabular-nums text-[var(--color-muted)]">1.0×</span>
+          <input id="speed" type="range" min="0" max="8" step="0.1" value="1" class="flex-1" />
+        </label>
+        <div class="btnrow flex gap-2">
+          <button id="pause" class="tool-btn flex-1">Pause</button>
+          <button id="reset" class="tool-btn flex-1">New world</button>
+        </div>
+        <div class="btnrow flex gap-2">
+          <button id="togglePher" class="tool-btn active flex-1" aria-pressed="true">Pheromones</button>
+          <button id="toggleVision" class="tool-btn flex-1" aria-pressed="false">Vision rays</button>
+        </div>
+      </section>
+
+      <section class="leaderboard panel-card">
+        <div class="lbtabs flex gap-1.5 mb-2">
+          <button id="tabLive" class="lbtab tool-btn active flex-1 !py-1.5 text-xs" aria-pressed="true">Top live</button>
+          <button id="tabFame" class="lbtab tool-btn flex-1 !py-1.5 text-xs" aria-pressed="false">All-time</button>
+        </div>
+        <div id="leaderboard"></div>
+      </section>
+
+      <section class="inspector panel-card text-[13px] leading-relaxed" id="inspector"></section>
+
+      <details class="legend panel-card">
+        <summary class="cursor-pointer list-none text-xs font-semibold uppercase tracking-wider text-[var(--color-muted)]">How it works</summary>
+        <ul class="mt-2.5 pl-4 grid gap-1.5 text-[12.5px] leading-snug text-[var(--color-muted)]">
+          <li>Ants use nearby food, walls, trails, energy, and nest direction to decide what to do.</li>
+          <li>Food grows colonies; successful ants shape the next generation.</li>
+          <li><b class="text-[var(--color-text)] font-semibold">Fitness</b> tracks survival and useful work.</li>
+        </ul>
+      </details>
+    </aside>
+  </main>
+
+  <script src="./dist/app.js" type="module"></script>
+</body>
+</html>
