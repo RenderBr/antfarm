@@ -1,15 +1,17 @@
 /* nn.ts — tiny evolvable feed-forward neural network.
  * Each ant carries one of these as its "brain". No backprop:
  * brains improve over generations through selection + mutation (a genetic algorithm).
+ * Most brains have DEFAULT_NEURONS hidden neurons; a tiny fraction (SUPER_CHANCE)
+ * are "super brains" with SUPER_NEURONS — a much richer architecture that can do
+ * more with the same 32 inputs and 9 outputs.
  */
 
 export const N_IN = 32;   // sensory inputs (terrain, threats, super-food)
-export const N_HID = 18;  // hidden neurons
 export const N_OUT = 9;   // action outputs
 
-const W1 = (N_IN + 1) * N_HID;          // input->hidden (with bias)
-const W2 = (N_HID + 1) * N_OUT;         // hidden->output (with bias)
-export const GENOME_SIZE = W1 + W2;
+export const DEFAULT_NEURONS = 18;
+export const SUPER_NEURONS = 300;
+export const SUPER_CHANCE = 1 / 400;
 
 function randn(): number {
   // Box-Muller
@@ -21,16 +23,26 @@ function randn(): number {
 
 export type Genome = Float32Array;
 
-export function randomGenome(): Genome {
-  const g = new Float32Array(GENOME_SIZE);
+function genomeSize(nHid: number): number {
+  return (N_IN + 1) * nHid + (nHid + 1) * N_OUT;
+}
+
+export function randomGenome(nHid?: number): Genome {
+  if (nHid === undefined) {
+    nHid = Math.random() < SUPER_CHANCE ? SUPER_NEURONS : DEFAULT_NEURONS;
+  }
+  const g = new Float32Array(genomeSize(nHid));
   for (let i = 0; i < g.length; i++) g[i] = randn() * 0.7;
   return g;
 }
 
 export function crossover(a: Genome, b: Genome): Genome {
-  const g = new Float32Array(GENOME_SIZE);
-  const cut = (Math.random() * GENOME_SIZE) | 0;
-  for (let i = 0; i < GENOME_SIZE; i++) {
+  if (a.length !== b.length) {
+    return new Float32Array(a);
+  }
+  const g = new Float32Array(a.length);
+  const cut = (Math.random() * a.length) | 0;
+  for (let i = 0; i < a.length; i++) {
     g[i] = (i < cut ? a[i] : b[i]);
     if (Math.random() < 0.15) g[i] = (g[i] + (Math.random() < 0.5 ? a[i] : b[i])) * 0.5;
   }
@@ -55,28 +67,39 @@ function tanh(x: number): number {
   return (e - 1) / (e + 1);
 }
 
+export function nHidFromGenome(len: number): number {
+  return Math.round((len - N_OUT) / (N_IN + 1 + N_OUT));
+}
+
+export function isSuper(b: { nHid: number }): boolean {
+  return b.nHid > DEFAULT_NEURONS;
+}
+
 export class Brain {
   g: Genome;
+  nHid: number;
   hidden: Float32Array;
   out: Float32Array;
 
   constructor(genome?: Genome) {
     this.g = genome || randomGenome();
-    this.hidden = new Float32Array(N_HID);
+    this.nHid = nHidFromGenome(this.g.length);
+    this.hidden = new Float32Array(this.nHid);
     this.out = new Float32Array(N_OUT);
   }
 
   forward(inp: Float32Array): Float32Array {
     const g = this.g, h = this.hidden, o = this.out;
+    const nHid = this.nHid;
     let w = 0;
-    for (let j = 0; j < N_HID; j++) {
-      let sum = g[w++]; // bias
+    for (let j = 0; j < nHid; j++) {
+      let sum = g[w++];
       for (let i = 0; i < N_IN; i++) sum += g[w++] * inp[i];
       h[j] = tanh(sum);
     }
     for (let k = 0; k < N_OUT; k++) {
-      let sum = g[w++]; // bias
-      for (let j = 0; j < N_HID; j++) sum += g[w++] * h[j];
+      let sum = g[w++];
+      for (let j = 0; j < nHid; j++) sum += g[w++] * h[j];
       o[k] = tanh(sum);
     }
     return o;
