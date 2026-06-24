@@ -1,6 +1,6 @@
 # AGENTS.md
 
-TypeScript + Bun + Tailwind ant-colony sim. Source in `src/*.ts`, bundled to `dist/`, served via `serve.js`.
+TypeScript + Bun + Tailwind ant-colony sim. Source in `src/*.ts`, bundled to `dist/`, served via `serve.ts`.
 
 ## Commands
 
@@ -10,7 +10,7 @@ bun run typecheck  # tsc --noEmit (strict)
 bun run build      # bun build src/main.ts -> dist/app.js  +  tailwind -> dist/app.css
 bun run watch      # rebuild JS and CSS on change
 bun run dev        # build once, then serve on http://localhost:5173
-bun serve          # serve built dist without rebuilding
+bun run serve      # serve built dist without rebuilding
 ```
 
 `index.html` loads `./dist/app.css` and `./dist/app.js` (ES module). Rebuild after editing TS/CSS before refreshing. There is no separate lint/test script; `bun run typecheck` is the gate.
@@ -19,7 +19,7 @@ bun serve          # serve built dist without rebuilding
 
 - `index.html` — page shell. Tailwind utility classes inline; small JS-driven component classes live in `src/input.css`.
 - `src/input.css` — Tailwind v4 entry (`@import "tailwindcss";`, `@theme` tokens, `@layer components` for `.tool-btn` / `.panel-card`, plus CSS for JS-generated markup like `.colrow`, `.lbrow`, `.ev`, `.bar`).
-- `serve.js` — tiny static dev server (Bun) so `index.html` can fetch `dist/*`.
+- `serve.ts` — tiny static dev server (Bun) so `index.html` can fetch `dist/*`. Defaults to port 5173; override with the `PORT` env var.
 - `tsconfig.json` — strict, `module:ESNext`, `moduleResolution:bundler`, `noEmit`.
 - `dist/` — build output (`app.js`, `app.css`). Regenerated; safe to delete.
 - `src/` — TypeScript modules (ES imports, no browser globals).
@@ -52,6 +52,6 @@ bun serve          # serve built dist without rebuilding
 ## Conventions
 
 - Strict TypeScript, ES-module imports (relative `./x.js` specifiers even for `.ts` sources — bundler resolution).
-- Circular deps are avoided with `import * as NN` and by typing cross-references through small interfaces (`AntSim`, `Colony` interface in `ant.ts`, `SpiderSim` in `spider.ts`, `WormSim` in `worm.ts`); `sim.ts` casts `a.colony as Colony` where it needs sim-only members.
+- Cross-module references go through small interfaces (`AntSim`, `Colony` interface in `ant.ts`, `SpiderSim` in `spider.ts`, `WormSim` in `worm.ts`) to avoid circular imports; `sim.ts` uses `import * as NN from "./nn.js"` for the same reason and casts `a.colony as Colony` where it needs sim-only members.
 - Comment-light; top-of-file block comments describe each module.
 - Don't commit `dist/` edits by hand — rebuild with `bun run build`. (It's fine to keep `dist/` out of version control; regenerate on demand.)
