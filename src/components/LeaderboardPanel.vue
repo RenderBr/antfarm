@@ -29,23 +29,25 @@ function onKey(e: KeyboardEvent, row: { id: number; live: boolean }) {
     <select v-model="category" class="lb-cat" aria-label="Leaderboard category">
       <option v-for="c in LB_CATEGORIES" :key="c.key" :value="c.key">{{ c.label }}</option>
     </select>
-    <div v-if="!snap || snap.entries.length === 0" class="lbempty">No ants yet.</div>
-    <div v-else>
+    <div class="lb-list">
+      <div v-if="!snap || snap.entries.length === 0" class="lbempty">No ants yet.</div>
       <div
-        v-for="(e, i) in snap.entries"
+        v-for="(e, i) in snap?.entries ?? []"
+        v-else
         :key="e.id"
         class="lbrow"
-        :class="{ sel: e.id === store.selectedId, dead: !e.live }"
+        :class="{ sel: e.id === store.selectedId }"
         :aria-disabled="e.live ? null : 'true'"
         :data-id="e.id"
         role="button"
         tabindex="0"
+        :title="`${cat.fmt(e)} · ${cat.small(e)}`"
         @click="selectRow(e)"
         @keydown="onKey($event, e)"
       >
         <span class="rank" :style="{ color: e.color }">{{ i + 1 }}</span>
-        <span class="who">Ant #{{ e.id }}<small>{{ e.colony }} · size {{ e.traits.size.toFixed(1) }} · speed {{ e.traits.speed.toFixed(1) }} · sense {{ e.traits.smarts.toFixed(1) }}</small></span>
-        <span class="fit">{{ cat.fmt(e) }}<small>{{ cat.small(e) }}</small></span>
+        <span class="who">Ant #{{ e.id }}<small>{{ e.colony }}</small></span>
+        <span class="fit">{{ cat.fmt(e) }}</span>
       </div>
     </div>
   </details>
@@ -87,25 +89,44 @@ function onKey(e: KeyboardEvent, row: { id: number; live: boolean }) {
 .leaderboard select.lb-cat:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
 .leaderboard select.lb-cat option { background: var(--color-panel); color: var(--color-text); }
 
+.lb-list {
+  max-height: 188px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.lb-list::-webkit-scrollbar { width: 6px; }
+.lb-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 999px; }
+
 .lbrow {
   display: grid;
-  grid-template-columns: 22px minmax(0,1fr) auto;
+  grid-template-columns: 20px minmax(0,1fr) auto;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 7px;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 5px;
   cursor: pointer;
   transition: background .12s;
+  font-size: 12px;
+  line-height: 1.3;
 }
+.lbrow + .lbrow { margin-top: 1px; }
 .lbrow:hover, .lbrow:focus-visible { background: rgba(255,255,255,0.04); outline: none; }
 .lbrow:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
-.lbrow[aria-disabled="true"] { cursor: default; }
+.lbrow[aria-disabled="true"] { cursor: default; opacity: 0.55; }
 .lbrow[aria-disabled="true"]:hover { background: transparent; }
-.lbrow.sel { background: rgba(224,163,90,0.16); border: 1px solid var(--color-accent); }
-.lbrow .rank { font-weight: 600; color: var(--color-muted); text-align: center; }
-.lbrow .who { font-size: 12.5px; font-weight: 600; display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.lbrow.sel { background: rgba(224,163,90,0.16); border: 1px solid var(--color-accent); padding: 2px 5px; }
+.lbrow .rank { font-weight: 600; color: var(--color-muted); text-align: center; font-variant-numeric: tabular-nums; }
+.lbrow .who {
+  font-weight: 600;
+  display: flex;
+  gap: 5px;
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .lbrow .who small { font-weight: 400; color: var(--color-muted); font-size: 10px; }
-.lbrow .fit { text-align: right; font-weight: 600; color: var(--color-green); display: flex; flex-direction: column; line-height: 1.2; }
-.lbrow .fit small { font-weight: 400; color: var(--color-muted); font-size: 10px; }
+.lbrow .fit { font-weight: 600; color: var(--color-green); font-variant-numeric: tabular-nums; }
 .lbempty { color: var(--color-muted); font-size: 12.5px; padding: 4px 2px; }
 </style>
