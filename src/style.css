@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #100c08;
+  --color-panel: #181410;
+  --color-card: #1f1a15;
+  --color-border: rgba(236, 228, 214, 0.10);
+  --color-text: #f0e7da;
+  --color-muted: #9f9588;
+  --color-accent: #d99a50;
+  --color-focus: #f0c26f;
+  --color-green: #84c97a;
+  --color-red: #d9785f;
+
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius-card: 12px;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+input[type="range"] { accent-color: var(--color-accent); }
+
+::selection { background: rgba(217,154,80,0.35); }
+
+@layer components {
+  .tool-btn {
+    @apply appearance-none cursor-pointer rounded-lg px-3 py-2 text-[13px] font-medium border border-[var(--color-border)]
+           bg-white/[0.03] text-[var(--color-text)] transition-colors duration-150
+           hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-[var(--color-focus)];
+  }
+  .tool-btn.active {
+    @apply bg-[color:rgba(217,154,80,0.18)] border-[var(--color-accent)] text-[#f4dcb6];
+  }
+  .panel-card {
+    @apply rounded-xl p-3.5 bg-white/[0.025] border border-[var(--color-border)];
+  }
+}
+
+.dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
+  margin-right: 6px;
+  vertical-align: middle;
+}

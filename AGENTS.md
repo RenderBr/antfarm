@@ -1,57 +1,67 @@
 # AGENTS.md
 
-TypeScript + Bun + Tailwind ant-colony sim. Source in `src/*.ts`, bundled to `dist/`, served via `serve.ts`.
+Vue 3 + TypeScript + Vite + Tailwind v4 ant-colony sim. Source in `src/`, UI in `src/components/*.vue`, canvas/sim renderer in `src/renderer/canvas.ts`, reactive store in `src/state/store.ts`, bundled to `dist/`.
 
 ## Commands
 
 ```bash
-bun install        # install dev deps (tailwindcss, @tailwindcss/cli, typescript)
-bun run typecheck  # tsc --noEmit (strict)
-bun run build      # bun build src/main.ts -> dist/app.js  +  tailwind -> dist/app.css
-bun run watch      # rebuild JS and CSS on change
-bun run dev        # build once, then serve on http://localhost:5173
-bun run serve      # serve built dist without rebuilding
+bun install        # install dev deps (vue, vite, @vitejs/plugin-vue, @tailwindcss/vite, tailwindcss, typescript, vue-tsc)
+bun run dev        # vite dev server on http://localhost:5173
+bun run build      # vue-tsc --noEmit + vite build  -> dist/
+bun run preview    # vite preview (serve dist/) on http://localhost:5173
+bun run typecheck  # vue-tsc --noEmit (strict, type-checks .vue + .ts)
 ```
 
-`index.html` loads `./dist/app.css` and `./dist/app.js` (ES module). Rebuild after editing TS/CSS before refreshing. There is no separate lint/test script; `bun run typecheck` is the gate.
+Bun is the package manager and script runner; Vite is the dev server and bundler. `index.html` is the Vite entry; the Vue app mounts `<div id="app">` from `src/main.ts` → `App.vue`.
 
 ## Layout
 
-- `index.html` — page shell. Tailwind utility classes inline; small JS-driven component classes live in `src/input.css`.
-- `src/input.css` — Tailwind v4 entry (`@import "tailwindcss";`, `@theme` tokens, `@layer components` for `.tool-btn` / `.panel-card`, plus CSS for JS-generated markup like `.colrow`, `.lbrow`, `.ev`, `.bar`).
-- `serve.ts` — tiny static dev server (Bun) so `index.html` can fetch `dist/*`. Defaults to port 5173; override with the `PORT` env var.
-- `tsconfig.json` — strict, `module:ESNext`, `moduleResolution:bundler`, `noEmit`.
-- `dist/` — build output (`app.js`, `app.css`). Regenerated; safe to delete.
-- `src/` — TypeScript modules (ES imports, no browser globals).
+- `index.html` — Vite shell (`<div id="app">` + `<script type="module" src="/src/main.ts">`).
+- `vite.config.ts` — Vite + `@vitejs/plugin-vue` + `@tailwindcss/vite`.
+- `tsconfig.app.json` / `tsconfig.node.json` — split configs (app vs vite.config).
+- `src/main.ts` — `createApp(App).mount("#app")`.
+- `src/App.vue` — root layout: `<Stage>` (canvas) + side panel composed of the section components.
+- `src/style.css` — Tailwind v4 entry (`@import "tailwindcss";`, `@theme` tokens, `@layer components` for `.tool-btn` / `.panel-card`, plus the `.dot` utility).
+- `src/state/store.ts` — single `reactive()` store: tool, paused, speed, showPher, showVision, brush, selectedId, lbCategory, uiSnap (5Hz snapshot), lbSnap (1Hz snapshot), and the `markRaw`ed `Renderer` instance. Components read/write it; the renderer reads/writes it.
+- `src/renderer/canvas.ts` — `Renderer` class. Owns the `<canvas>`, the camera, world + sim, offscreen terrain/dyn layers. Runs the `requestAnimationFrame` loop: `sim.update` (speed-scaled substeps) → `draw` → throttled snapshot pushes (5Hz uiSnap, 1Hz lbSnap). Handles canvas input (mousedown/move/up/wheel/contextmenu) and reads tool/paused/speed/showPher/showVision/brush/selectedId from the store. Exposes `reset()` and `centerOnAnt(id)`.
+- `src/leaderboard.ts` — `LB_CATEGORIES` + `buildLbEntries(sim)` + `getCategory(key)`. Shared by the renderer (computes top-8) and `LeaderboardPanel.vue` (formats rows).
+- `src/components/Stage.vue` — canvas + toolbar + hint overlay. Creates the `Renderer` on mount.
+- `src/components/StatsPanel.vue` removed; the 4 stat cards live inline in `App.vue` (same data, simpler).
+- `src/components/ColoniesPanel.vue` — colonies list + events.
+- `src/components/ControlsPanel.vue` — speed, pause/reset, pheromone/vision toggles.
+- `src/components/InspectorPanel.vue` — selected-ant details. The `<details>` "Brain outputs" preserves its open state automatically because Vue patches the element (doesn't recreate it) on re-render; brain output bars use `:style="{ width }"` and update in place.
+- `src/components/LeaderboardPanel.vue` — collapsible `<details>`, `<select>` of 6 categories, `v-for` over the top-8 entries (keyed by id; Vue's reconciliation keeps the DOM stable so the scoreboard doesn't flicker). Click/keydown on a row calls `store.renderer?.centerOnAnt(id)`.
+- `src/components/LegendPanel.vue` — static "How it works" `<details>`.
 
-## TS modules
+## TS modules (sim — framework-agnostic, unchanged from before)
 
 | File | Exports | Role |
 |------|---------|------|
-| `src/nn.ts`     | `Brain`, `randomGenome`, `crossover`, `mutate`, `N_IN/N_HID/N_OUT`, `GENOME_SIZE`, `Genome` | Evolvable feed-forward net. GA only — no backprop. |
-| `src/world.ts`  | `World`, `TILE` consts (`GROUND/DIRT/WALL/NEST/ROCK`), `CS`, `isSolid`, `Tile`, `PNO` | Tile grid (`Uint8Array`), `food`, pheromone fields `phF`/`phH`, `dirty` flags. |
-| `src/ant.ts`     | `Ant` (+ static `CARRY_*`, `randomTraits`, `breedTraits`), `Traits`, `Colony`/`AntSim` interfaces | Per-ant sensing + actions via its `Brain`. Circularity with sim broken via `AntSim` interface. |
-| `src/spider.ts` | `Spider` (+ static `randomGenes`/`breedGenes`), `SpiderGenes` | Predator that hunts ants; evolves. |
-| `src/worm.ts`   | `Worm` (+ static `randomGenes`/`breedGenes`), `WormGenes` | Burrowing organism that enriches soil. |
-| `src/sim.ts`    | `Simulation`, `Colony`, `Champion`, `SuperFood`, `SimOpts` | Colonies, queen/eggs, gene pool, predators, evolution loop, event log, hall of fame. `new Simulation(world, opts)`. |
-| `src/app.ts`    | (side-effect import) | Rendering (camera + offscreen terrain/dyn layers), input/tools, UI, main loop. |
-| `src/main.ts`   | `import "./app.js"` | Bun build entry point. |
+| `src/nn.ts`     | `Brain`, `randomGenome`, `crossover`, `mutate`, `N_IN/N_OUT`, `MIN_NEURONS/MAX_NEURONS`, `nHidFromGenome` | Evolvable feed-forward net. GA only — no backprop. Hidden size is a random integer in [18, 300]. |
+| `src/world.ts`  | `World`, `TILE` consts (`GROUND/DIRT/WALL/NEST/ROCK`), `CS`, `isSolid` | Tile grid, food, pheromone fields, dirty flags. |
+| `src/ant.ts`    | `Ant` + statics (`CARRY_*`, `randomTraits`, `breedTraits`), `Traits`, `Colony`/`AntSim` interfaces | Per-ant sensing + actions via its `Brain`. |
+| `src/spider.ts` | `Spider` + statics (`randomGenes`, `breedGenes`), `SpiderGenes`/`SpiderSim` | Predator; evolves. |
+| `src/worm.ts`   | `Worm` + statics (`randomGenes`, `breedGenes`), `WormGenes`/`WormSim` | Burrowing organism. |
+| `src/sim.ts`    | `Simulation`, `Colony`, `Champion`, `SuperFood`, `LogEntry`, `SimOpts` | Colonies, queen/eggs, gene pool, predators, evolution, hall of fame. |
 
-## Key data flow
+## Data flow
 
-`app.ts` owns `world` + `sim` → `requestAnimationFrame` loop ticks `sim.update(dt)` → ants/spiders/worms act → `app.ts` repaints the canvas and refreshes DOM panels (`updateStats`, `updateInspector`, `updateLeaderboard`, colonies/eventlog).
+`Stage.vue` mounts → creates `Renderer` → the renderer's `requestAnimationFrame` loop ticks `sim.update` → ants/spiders/worms act → `Renderer.draw` repaints the canvas → throttled pushes write `uiSnap` (5Hz) / `lbSnap` (1Hz) into the `store`. Vue components re-render reactively when those snapshots (or `store.tool` / `store.selectedId` / etc.) change.
 
 ## When editing
 
-- **UI / markup:** `index.html` (Tailwind classes) + `src/input.css` (component/JS-markup styles) + the `update*` functions in `src/app.ts` (search `ui.stats`, `ui.inspector`, `ui.leaderboard`, `ui.colonies`, `ui.eventlog`). Run `bun run build:css` after CSS changes; the page must reload `dist/app.css`.
-- **Sim rules / evolution / balance:** `src/sim.ts` (largest) and `src/ant.ts`.
-- **Brain architecture / sensors:** `src/nn.ts` (constants at top) + sensing in `src/ant.ts`.
+- **UI / markup:** the relevant `.vue` SFC. Tailwind utility classes inline; component-scoped styles in the SFC's `<style scoped>` for things awkward in utilities (bars, row layouts, the select chevron). Run `bun run dev` for HMR; `bun run build` to verify the production build.
+- **Sim rules / evolution / balance:** `src/sim.ts` and `src/ant.ts`.
+- **Brain / sensors:** `src/nn.ts` + sensing in `src/ant.ts`.
 - **World gen / tiles / food / pheromones:** `src/world.ts`.
-- **Rendering / camera / tools / input:** `src/app.ts` (search `cam`, `paintAllTerrain`, `applyBrush`).
+- **Rendering / camera / tools / input:** `src/renderer/canvas.ts`.
+- **Leaderboard categories / formatting:** `src/leaderboard.ts`.
+- **Reactive store / snapshot shapes:** `src/state/store.ts`.
 
 ## Conventions
 
-- Strict TypeScript, ES-module imports (relative `./x.js` specifiers even for `.ts` sources — bundler resolution).
-- Cross-module references go through small interfaces (`AntSim`, `Colony` interface in `ant.ts`, `SpiderSim` in `spider.ts`, `WormSim` in `worm.ts`) to avoid circular imports; `sim.ts` uses `import * as NN from "./nn.js"` for the same reason and casts `a.colony as Colony` where it needs sim-only members.
+- Strict TypeScript, ES-module imports, relative `./x.js` specifiers.
+- Cross-module circular deps are broken with small interfaces (`AntSim`, `Colony` in `ant.ts`, `SpiderSim`, `WormSim`); `sim.ts` casts `a.colony as Colony` where it needs sim-only members.
+- Component-scoped styles preferred; truly shared classes (`.tool-btn`, `.panel-card`, `.dot`) live in `src/style.css`.
+- Non-reactive class instances (the `Renderer`) are stored on the reactive store via `markRaw` and accessed as `store.renderer`.
 - Comment-light; top-of-file block comments describe each module.
-- Don't commit `dist/` edits by hand — rebuild with `bun run build`. (It's fine to keep `dist/` out of version control; regenerate on demand.)
