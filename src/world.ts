@@ -17,6 +17,8 @@ export function isSolid(t: number): boolean { return t === DIRT || t === WALL ||
 
 export const TILE = { GROUND, DIRT, WALL, NEST, ROCK, CS, isSolid };
 
+import { FOOD_NONE, pickFoodType } from "./foods.js";
+
 export interface PNO { x: number; y: number; }
 
 export class World {
@@ -27,6 +29,7 @@ export class World {
   ph: number;
   tiles: Uint8Array;
   food: Float32Array;
+  foodType: Uint8Array; // per-cell type id (FOOD_NONE if empty)
   phF: Float32Array; // food-trail pheromone
   phH: Float32Array; // home-trail pheromone
   dirty: Uint8Array; // tile render-dirty flags
@@ -40,6 +43,7 @@ export class World {
     const n = w * h;
     this.tiles = new Uint8Array(n);
     this.food = new Float32Array(n);
+    this.foodType = new Uint8Array(n).fill(FOOD_NONE);
     this.phF = new Float32Array(n);
     this.phH = new Float32Array(n);
     this.dirty = new Uint8Array(n);
@@ -126,7 +130,8 @@ export class World {
 
   cellCenterPx(cx: number, cy: number): PNO { return { x: (cx + 0.5) * CS, y: (cy + 0.5) * CS }; }
 
-  spawnFoodCluster(cx: number, cy: number, r: number, amount: number): void {
+  spawnFoodCluster(cx: number, cy: number, r: number, amount: number, type?: number): void {
+    const ft = type === undefined ? pickFoodType() : type;
     for (let y = -r; y <= r; y++) {
       for (let x = -r; x <= r; x++) {
         if (x * x + y * y > r * r) continue;
@@ -135,6 +140,7 @@ export class World {
         const i = this.idx(tx, ty);
         if (isSolid(this.tiles[i])) continue;
         this.food[i] += amount * (0.4 + Math.random() * 0.6) / (1 + x * x + y * y);
+        this.foodType[i] = ft;
       }
     }
   }

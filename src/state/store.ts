@@ -35,6 +35,8 @@ export interface SelectedSnap {
   lastAction: string;
   carry: number;
   carryLabel: string;
+  carryType: number;
+  carryFoodName: string;
   energy: number;
   hp: number;
   maxHp: number;
@@ -47,6 +49,11 @@ export interface SelectedSnap {
   soilMoved: number;
   kills: number;
   brainOutputs: number[];
+  smartsBoost: number;
+  smartsBoostTimer: number;
+  hpRegen: number;
+  hpRegenTimer: number;
+  poisonTimer: number;
 }
 
 export interface UiSnap {

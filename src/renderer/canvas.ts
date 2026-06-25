@@ -19,6 +19,11 @@ import {
   buildLbEntries, getCategory,
   type LbEntry,
 } from "../leaderboard.js";
+import { FOOD_NONE, NUM_FOODS, pickFoodType, foodName } from "../foods.js";
+import {
+  bakeAllFoodSprites, computeAppearance, darkenHex,
+  FOOD_GRID_PX,
+} from "./sprites.js";
 
 const GRID_W = 170;
 const GRID_H = 108;
@@ -70,6 +75,9 @@ export class Renderer {
   private raf = 0;
   private wakeLock: WakeLockSentinel | null = null;
 
+  private foodSprites: HTMLCanvasElement[] = [];
+  private brushFoodType: number = 0;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     const ctx = canvas.getContext("2d");
@@ -82,6 +90,7 @@ export class Renderer {
     this.terrainCtx = tctx;
 
     setRenderer(this);
+    this.foodSprites = bakeAllFoodSprites();
     this.buildWorld();
     this.resize();
     this.attachInput();
@@ -177,16 +186,11 @@ export class Renderer {
 
   private buildDynLayer(): void {
     const d = this.dynImg.data;
-    const { food, phF, phH } = this.world;
+    const { phF, phH } = this.world;
     const show = store.showPher;
-    for (let i = 0; i < food.length; i++) {
+    for (let i = 0; i < phF.length; i++) {
       const p = i * 4;
-      const f = food[i];
       let r = 0, g = 0, b = 0, a = 0;
-      if (f > 0.05) {
-        const k = Math.min(1, f * 0.13);
-        r = 120 + 135 * k; g = 200 + 40 * k; b = 70; a = 120 + 130 * k;
-      }
       if (show) {
         const pf = Math.min(1, phF[i] * 0.4);
         const ph = Math.min(1, phH[i] * 0.4);
@@ -219,6 +223,8 @@ export class Renderer {
     ctx.drawImage(this.dynCv, 0, 0, this.world.w, this.world.h, 0, 0, this.world.pw, this.world.ph);
     ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = false;
+
+    this.drawFood();
 
     for (const col of this.sim.colonies) {
       const n = col.nestPx;
@@ -282,28 +288,183 @@ export class Renderer {
     }
   }
 
+  private drawFood(): void {
+    const ctx = this.ctx;
+    const w = this.world;
+    const sprites = this.foodSprites;
+    if (sprites.length === 0) return;
+    ctx.imageSmoothingEnabled = false;
+    const W = w.w, H = w.h;
+    for (let cy = 0; cy < H; cy++) {
+      const yp = (cy + 0.5) * CS;
+      for (let cx = 0; cx < W; cx++) {
+        const i = cy * W + cx;
+        const f = w.food[i];
+        if (f < 0.2) continue;
+        const ft = w.foodType[i];
+        if (ft === FOOD_NONE || ft >= sprites.length) continue;
+        const spr = sprites[ft];
+        if (!spr) continue;
+        const k = Math.min(1, f * 0.13);
+        const sz = 12 + 5 * k;
+        const xp = (cx + 0.5) * CS;
+        ctx.globalAlpha = 0.85 + 0.15 * k;
+        ctx.drawImage(spr, 0, 0, FOOD_GRID_PX, FOOD_GRID_PX, xp - sz / 2, yp - sz / 2, sz, sz);
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
   private drawAnts(): void {
     const ctx = this.ctx;
+    const sprites = this.foodSprites;
     for (const a of this.sim.ants) {
-      const r = Math.max(1.4, CS * 0.42 * a.traits.size);
-      const cargo = a.carry === CARRY_FOOD ? "#7CFF6B"
-                  : a.carry === CARRY_SOIL ? "#C8965A"
-                  : a.carry === CARRY_SUPER ? "#ffd84a" : null;
-      ctx.fillStyle = a.colony.color;
-      ctx.beginPath();
-      ctx.ellipse(a.x, a.y, r * 1.5, r * 0.95, a.heading, 0, Math.PI * 2);
-      ctx.fill();
+      const t = a.traits;
+      const r = Math.max(1.6, 4.2 * t.size);
       const isSel = a.id === store.selectedId;
-      ctx.fillStyle = isSel ? "#ffe27a" : (cargo || "#1a1411");
+      const app = computeAppearance(a.brain.g);
+      const col = a.colony.color;
+      const bodyCol = darkenHex(col, -app.hueShift * 0.3);
+      const thxCol = darkenHex(col, 0.2);
+      const headCol = isSel ? "#ffe27a" : darkenHex(col, 0.35);
+      const legCol = darkenHex(col, 0.55);
+      const cargo = a.carry;
+
+      ctx.save();
+      ctx.translate(a.x, a.y);
+      ctx.rotate(a.heading);
+
+      const legLen = 1.7 * r * (0.7 + 0.5 * t.speed);
+      const legSpread = [0.7, 0, -0.7][app.legStyle & 1 ? 1 : 0] || (app.legStyle < 2 ? -0.4 : 0.4);
+      ctx.strokeStyle = legCol;
+      ctx.lineWidth = Math.max(0.5, r * 0.16);
+      ctx.lineCap = "round";
+      for (let i = 0; i < 3; i++) {
+        const sx = 0.4 * r + (i - 1) * 0.8 * r;
+        const sw = Math.sin(a.age * 9 + i * 1.7) * 0.35;
+        for (const side of [-1, 1]) {
+          const baseAng = side * (Math.PI / 2 + legSpread * 0.4);
+          const tipAng = baseAng + sw * 0.6;
+          const kx = sx + Math.cos(baseAng) * legLen;
+          const ky = side * 0.5 * r + Math.sin(baseAng) * legLen;
+          const ex = sx + Math.cos(tipAng) * legLen * 1.55;
+          const ey = side * 0.5 * r + Math.sin(tipAng) * legLen * 1.55;
+          ctx.beginPath();
+          ctx.moveTo(sx, side * 0.5 * r);
+          ctx.lineTo(kx, ky);
+          ctx.lineTo(ex, ey);
+          ctx.stroke();
+        }
+      }
+      ctx.lineCap = "butt";
+
+      ctx.fillStyle = bodyCol;
       ctx.beginPath();
-      ctx.arc(a.x + Math.cos(a.heading) * r * 1.4, a.y + Math.sin(a.heading) * r * 1.4, r * 0.72, 0, Math.PI * 2);
+      ctx.ellipse(-1.9 * r, 0, 1.3 * r, 0.95 * r, 0, 0, Math.PI * 2);
       ctx.fill();
+
+      ctx.fillStyle = thxCol;
+      ctx.beginPath();
+      ctx.ellipse(0.15 * r, 0, 0.75 * r, 0.6 * r, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (app.spots > 0) {
+        ctx.fillStyle = darkenHex(col, -0.4);
+        for (let i = 0; i < app.spots; i++) {
+          const sx = -1.4 * r + (i - 1) * 0.6 * r;
+          const sy = (i - 1) * 0.3 * r;
+          ctx.beginPath();
+          ctx.arc(sx, sy, 0.18 * r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      if (app.stripe) {
+        ctx.fillStyle = "rgba(255,220,120,0.85)";
+        ctx.fillRect(-1.8 * r, -0.18 * r, 0.7 * r, 0.36 * r);
+      }
+
+      ctx.fillStyle = headCol;
+      ctx.beginPath();
+      ctx.arc(1.05 * r, 0, 0.55 * r, 0, Math.PI * 2);
+      ctx.fill();
+
+      const manSize = 0.45 * r * (0.4 + 0.6 * t.smarts);
+      ctx.fillStyle = darkenHex(col, 0.6);
+      ctx.beginPath();
+      ctx.moveTo(1.55 * r, -0.2 * r);
+      ctx.lineTo(1.55 * r + manSize, -0.45 * r);
+      ctx.lineTo(1.35 * r, -0.2 * r);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(1.55 * r, 0.2 * r);
+      ctx.lineTo(1.55 * r + manSize, 0.45 * r);
+      ctx.lineTo(1.35 * r, 0.2 * r);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = legCol;
+      ctx.lineWidth = Math.max(0.4, r * 0.13);
+      ctx.lineCap = "round";
+      const antLen = 1.1 * r * (0.6 + 0.5 * t.smarts);
+      const curve = app.antennaeCurve;
+      for (const side of [-1, 1]) {
+        const cx0 = 1.45 * r, cy0 = side * 0.25 * r;
+        const cx1 = 1.45 * r + antLen * 0.55, cy1 = side * 0.25 * r + curve * 0.3 * r;
+        const cx2 = 1.45 * r + antLen, cy2 = side * 0.55 * r;
+        ctx.beginPath();
+        ctx.moveTo(cx0, cy0);
+        ctx.quadraticCurveTo(cx1, cy1, cx2, cy2);
+        ctx.stroke();
+      }
+      ctx.lineCap = "butt";
+
+      if (app.headGlint) {
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.beginPath();
+        ctx.arc(1.15 * r, -0.2 * r, 0.14 * r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (cargo === CARRY_FOOD && a.carryType !== FOOD_NONE && a.carryType < sprites.length && sprites[a.carryType]) {
+        const sz = 1.5 * r;
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(sprites[a.carryType], 0, 0, FOOD_GRID_PX, FOOD_GRID_PX, -0.4 * r - sz / 2, -1.4 * r, sz, sz);
+      } else if (cargo === CARRY_SOIL) {
+        ctx.fillStyle = "#C8965A";
+        ctx.beginPath();
+        ctx.arc(-1.6 * r, -1.1 * r, 0.32 * r, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (cargo === CARRY_SUPER) {
+        ctx.fillStyle = "#ffd84a";
+        ctx.beginPath();
+        ctx.arc(-1.6 * r, -1.1 * r, 0.4 * r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,255,180,0.6)";
+        ctx.beginPath();
+        ctx.arc(-1.6 * r, -1.1 * r, 0.55 * r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+
       if (a.hp < a.maxHp * 0.5) {
         ctx.strokeStyle = "rgba(255,60,40,0.7)";
         ctx.lineWidth = 0.8 / this.cam.zoom;
-        ctx.beginPath(); ctx.arc(a.x, a.y, r * 2.0, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(a.x, a.y, r * 2.2, 0, Math.PI * 2); ctx.stroke();
+      }
+      if (a.poisonTimer > 0) {
+        ctx.fillStyle = "rgba(120,210,80,0.75)";
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.arc(a.x + Math.cos(performance.now() * 0.004 + i) * r * 1.8,
+                  a.y + Math.sin(performance.now() * 0.004 + i) * r * 1.8,
+                  r * 0.18, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
+    ctx.imageSmoothingEnabled = false;
   }
 
   private drawSpiders(): void {
@@ -372,10 +533,13 @@ export class Renderer {
         const i = this.world.idx(tx, ty);
         if (this.world.tiles[i] === ROCK || this.world.tiles[i] === NEST) continue;
         const tool = store.tool;
-        if (tool === "food") { this.world.food[i] += 8; }
-        else if (tool === "dirt") { this.world.setTile(tx, ty, DIRT); }
-        else if (tool === "wall") { this.world.setTile(tx, ty, WALL); }
-        else if (tool === "erase") { this.world.setTile(tx, ty, GROUND); this.world.food[i] = 0; }
+      if (tool === "food") {
+        this.world.food[i] += 8;
+        this.world.foodType[i] = this.brushFoodType;
+      }
+      else if (tool === "dirt") { this.world.setTile(tx, ty, DIRT); }
+      else if (tool === "wall") { this.world.setTile(tx, ty, WALL); }
+      else if (tool === "erase") { this.world.setTile(tx, ty, GROUND); this.world.food[i] = 0; this.world.foodType[i] = FOOD_NONE; }
       }
     }
   }
@@ -407,6 +571,7 @@ export class Renderer {
     } else if (tool === "spider") {
       this.sim.spawnSpider(w.x, w.y);
     } else {
+      if (tool === "food") this.brushFoodType = pickFoodType();
       this.dragging = true; this.applyBrush(w.x, w.y);
     }
   };
@@ -496,6 +661,8 @@ export class Renderer {
         lastAction: sel.lastAction,
         carry: sel.carry,
         carryLabel: carryLabel(sel.carry),
+        carryType: sel.carryType,
+        carryFoodName: foodName(sel.carryType),
         energy: sel.energy,
         hp: sel.hp,
         maxHp: sel.maxHp,
@@ -508,6 +675,11 @@ export class Renderer {
         soilMoved: sel.soilMoved,
         kills: sel.kills,
         brainOutputs: [o[0], o[1], o[2], o[3], o[4], o[5], o[6], o[7], o[8]],
+        smartsBoost: sel.smartsBoost,
+        smartsBoostTimer: sel.smartsBoostTimer,
+        hpRegen: sel.hpRegen,
+        hpRegenTimer: sel.hpRegenTimer,
+        poisonTimer: sel.poisonTimer,
       };
     } else if (sel && !sel.alive) {
       store.selectedId = null;

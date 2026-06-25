@@ -17,8 +17,9 @@ bun run dev        # http://localhost:5173
 ```
 
 Edit Vue components in `src/components/`, the canvas/sim renderer in
-`src/renderer/canvas.ts`, or the reactive store in `src/state/store.ts`, then save —
-HMR reloads the page.
+`src/renderer/canvas.ts`, the food + appearance sprites in
+`src/renderer/sprites.ts` + `src/foods.ts`, or the reactive store in
+`src/state/store.ts`, then save — HMR reloads the page.
 
 Production build:
 
@@ -44,8 +45,27 @@ bun run preview    # serve dist/ at http://localhost:5173
 - Ants **dig** dirt into carried soil and **build** it back as walls anywhere — they reshape
   their world.
 - Two evaporating/diffusing **pheromone fields** (food trail + home trail) ants can read and lay.
-- Food clusters that the world keeps replenishes, plus rare **super-food** that triggers a
-  fertility surge when delivered.
+- Eight **typed food clusters** that the world keeps replenishing, plus rare **super-food**
+  that triggers a fertility surge when delivered.
+
+### Food types & effects
+
+Each cell has a *type*, not just an amount — and each type has a real effect when an ant
+eats it. Sprites are hand-painted 14×14 pixel art, baked once and blitted crisp at any zoom.
+
+| Food | Sprite | Effect |
+|------|--------|--------|
+| Apple | red w/ leaf | +30 energy |
+| Blueberry | dark-blue cluster | +0.4 smarts (longer sensor range) for 12s |
+| Grape | purple cluster | +55 energy |
+| Strawberry | red w/ seeds | +1 max HP (permanent) |
+| Mushroom | red cap + spots | 50/50: +80 energy **or** poison (5 energy/s for 5s) |
+| Banana | yellow crescent | +25 energy |
+| Cherry | twin red | +0.3 smarts for 10s |
+| Acorn | brown cap | +0.8 HP/s regen for 15s |
+
+Active effects are shown as timed pill badges in the inspector (`+smarts`, `+regen`,
+`poisoned`). Carried food shows as a small sprite above the ant's back.
 
 **Survival & evolution (genetic algorithm, no backprop):**
 - Ants spend energy moving/working and must **eat field food** to survive.
@@ -61,6 +81,22 @@ bun run preview    # serve dist/ at http://localhost:5173
   spiders alike.
 - Spiders occasionally found **hybrid colonies** by mating across colony lines.
 
+### Appearance evolves with the genome
+
+Each ant's body is rendered as a real 3-segment insect (abdomen → thorax → head) with 6
+walking legs, 2 antennae, and mandibles. The shape is driven by its **traits** and by
+a stable hash of its **brain genome** (so the look changes as the brain mutates):
+
+- **Colony color** — body tint
+- **`traits.size`** — body scale
+- **`traits.speed`** — leg length + walking gait
+- **`traits.smarts`** — antennae length + mandible size
+- **Genome hash bits** — abdomen stripe, thorax spot count, hue shift, leg style,
+  antennae curve, head glint
+
+Two ants in the same colony can look very different, and their descendants inherit
+(but mutate) the pattern, so a colony's appearance drifts visibly over generations.
+
 ## Controls
 
 - **Scroll** to zoom, **drag** to pan.
@@ -72,11 +108,13 @@ bun run preview    # serve dist/ at http://localhost:5173
 
 ## Architecture
 
-- **`src/nn.ts`, `src/world.ts`, `src/ant.ts`, `src/spider.ts`, `src/worm.ts`, `src/sim.ts`** —
-  the pure simulation (framework-agnostic, no DOM).
-- **`src/renderer/canvas.ts`** — Canvas2D renderer + main loop. Owns the canvas, camera,
-  world/sim, and offscreen layers. Reads tool/paused/speed/etc. from the store and pushes
-  throttled UI snapshots back into it.
+- **`src/nn.ts`, `src/world.ts`, `src/foods.ts`, `src/ant.ts`, `src/spider.ts`, `src/worm.ts`,
+  `src/sim.ts`** — the pure simulation (framework-agnostic, no DOM). `foods.ts` holds the
+  8 typed food definitions (sprite, palette, energy, effect).
+- **`src/renderer/canvas.ts`** + **`src/renderer/sprites.ts`** — Canvas2D renderer + main
+  loop. Owns the canvas, camera, world/sim, and offscreen layers. `sprites.ts` bakes the
+  food sprites once and computes per-ant appearance from the genome hash. Reads
+  tool/paused/speed/etc. from the store and pushes throttled UI snapshots back into it.
 - **`src/state/store.ts`** — single `reactive()` store shared by the renderer and the
   Vue components. The `Renderer` instance is attached via `markRaw` so it isn't proxied.
 - **`src/App.vue`** + **`src/components/*.vue`** — the UI. Vue's reactive bindings
@@ -92,8 +130,10 @@ src/                       App.vue, main.ts, style.css
   components/              Stage, ColoniesPanel, ControlsPanel, InspectorPanel,
                           LeaderboardPanel, LegendPanel (.vue SFCs)
   renderer/canvas.ts       Renderer class (Canvas2D + loop + input)
+  renderer/sprites.ts      food sprite baker + genome-appearance hash
   state/store.ts           reactive store + UiSnap / LbSnap shapes
   leaderboard.ts           categories + entry builder (shared renderer ↔ component)
+  foods.ts                 8 typed food definitions
   nn.ts, world.ts, ant.ts, spider.ts, worm.ts, sim.ts   (the simulation)
 index.html                 Vite entry
 vite.config.ts             Vite + Vue + Tailwind plugin

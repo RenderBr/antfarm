@@ -6,6 +6,7 @@
 import { GROUND, DIRT, WALL, NEST, ROCK, CS, isSolid, World } from "./world.js";
 import { N_IN, Brain } from "./nn.js";
 import type { Genome } from "./nn.js";
+import { FOOD_NONE, foodName, FOOD_BY_ID, type FoodEffect } from "./foods.js";
 
 export const CARRY_NONE = 0, CARRY_FOOD = 1, CARRY_SOIL = 2, CARRY_SUPER = 3;
 export type Carry = 0 | 1 | 2 | 3;
@@ -71,7 +72,6 @@ export class Ant {
   maxSpeed: number;
   maxHp: number;
   hp: number;
-  sensorDist: number;
   metabRate: number;
   carryCap: number;
 
@@ -89,6 +89,14 @@ export class Ant {
   brainScore: number;
   superDelivered?: number;
   killedBySpider?: boolean;
+
+  carryType: number;
+  smartsBoost: number;
+  smartsBoostTimer: number;
+  hpRegen: number;
+  hpRegenTimer: number;
+  poisonDps: number;
+  poisonTimer: number;
 
   private _osc: number;
   _in: Float32Array;
@@ -115,7 +123,6 @@ export class Ant {
     this.maxSpeed = 34 * t.speed;
     this.maxHp = 12 * t.size + 4;
     this.hp = this.maxHp;
-    this.sensorDist = CS * 2.2 * (0.7 + 0.5 * t.smarts);
     this.metabRate = (0.25) * (0.6 + 0.4 * t.size) * (0.75 + 0.3 * t.smarts);
     this.carryCap = 2 + t.size * 2;
 
@@ -132,6 +139,14 @@ export class Ant {
     this.fitness = 0;
     this.brainScore = 0;
 
+    this.carryType = FOOD_NONE;
+    this.smartsBoost = 0;
+    this.smartsBoostTimer = 0;
+    this.hpRegen = 0;
+    this.hpRegenTimer = 0;
+    this.poisonDps = 0;
+    this.poisonTimer = 0;
+
     this._osc = Math.random() * Math.PI * 2;
     this._in = new Float32Array(N_IN);
     this._brainBuf = new Float32Array(BRAIN_SAMPLES * N_OUT);
@@ -141,6 +156,10 @@ export class Ant {
     this.lastAction = "wander";
     this.actCool = 0;
     this.bornGen = 1;
+  }
+
+  get sensorDist(): number {
+    return CS * 2.2 * (0.7 + 0.5 * (this.traits.smarts + this.smartsBoost));
   }
 
   get nestPx(): { x: number; y: number } { return this.colony.nestPx; }
@@ -270,10 +289,16 @@ export class Ant {
         const take = Math.min(w.food[here], this.carryCap);
         w.food[here] -= take;
         this.carry = CARRY_FOOD; this.carryAmt = take;
-        this.lastAction = "grab food"; this.actCool = 0.2;
+        const ft = w.foodType[here];
+        this.carryType = ft;
+        const def = ft < FOOD_BY_ID.length ? FOOD_BY_ID[ft] : null;
+        this.lastAction = def ? `grab ${def.name}` : "grab food";
+        this.actCool = 0.2;
+        if (def) applyFoodEffect(this, def.effect);
       } else if (o[5] > 0.5 && this.carry !== CARRY_NONE) {
         if (this.carry === CARRY_FOOD) w.food[here] += this.carryAmt;
         this.carry = CARRY_NONE; this.carryAmt = 0;
+        this.carryType = FOOD_NONE;
         this.lastAction = "drop"; this.actCool = 0.2;
       }
     }
@@ -300,6 +325,7 @@ export class Ant {
       this.foodDelivered += this.carryAmt;
       this.energy = Math.min(100, this.energy + 18);
       this.carry = CARRY_NONE; this.carryAmt = 0;
+      this.carryType = FOOD_NONE;
       this.lastAction = "deliver";
     } else if (atNest && this.carry === CARRY_SUPER) {
       this.colony.store += 220;
@@ -314,9 +340,59 @@ export class Ant {
     this.fitness = this.foodDelivered * 30 + this.soilMoved * 1.2 + this.age * 0.04 +
                    this.damageDealt * 0.4 + this.kills * 12;
 
+    if (this.smartsBoostTimer > 0) {
+      this.smartsBoostTimer -= dt;
+      if (this.smartsBoostTimer <= 0) { this.smartsBoostTimer = 0; this.smartsBoost = 0; }
+    }
+    if (this.hpRegenTimer > 0) {
+      this.hpRegenTimer -= dt;
+      if (this.hpRegenTimer <= 0) { this.hpRegenTimer = 0; this.hpRegen = 0; }
+      else if (this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + this.hpRegen * dt);
+    }
+    if (this.poisonTimer > 0) {
+      this.poisonTimer -= dt;
+      this.energy -= this.poisonDps * dt;
+      if (this.poisonTimer <= 0) { this.poisonTimer = 0; this.poisonDps = 0; }
+    }
+
     if (this.energy <= 0) { this.alive = false; this.energy = 0; }
   }
 }
+
+function applyFoodEffect(ant: Ant, eff: FoodEffect): void {
+  if (eff.kind === "random") {
+    applyFoodEffect(ant, Math.random() < 0.5 ? eff.buff : eff.debuff);
+    return;
+  }
+  if (eff.kind === "energy") {
+    ant.energy = Math.min(100, ant.energy + eff.amount);
+    return;
+  }
+  if (eff.kind === "smarts_boost") {
+    ant.smartsBoost = Math.max(ant.smartsBoost, eff.amount);
+    ant.smartsBoostTimer = Math.max(ant.smartsBoostTimer, eff.duration);
+    return;
+  }
+  if (eff.kind === "max_hp") {
+    ant.maxHp += eff.amount;
+    ant.hp += eff.amount;
+    return;
+  }
+  if (eff.kind === "hp_regen") {
+    ant.hpRegen = Math.max(ant.hpRegen, eff.perSec);
+    ant.hpRegenTimer = Math.max(ant.hpRegenTimer, eff.duration);
+    return;
+  }
+  if (eff.kind === "poison") {
+    ant.poisonDps = Math.max(ant.poisonDps, eff.damage);
+    ant.poisonTimer = Math.max(ant.poisonTimer, eff.duration);
+    ant.energy = Math.max(0, ant.energy - 12);
+    ant.lastAction = "poisoned!";
+    return;
+  }
+}
+
+void foodName;
 
 Ant.CARRY_NONE = CARRY_NONE;
 Ant.CARRY_FOOD = CARRY_FOOD;

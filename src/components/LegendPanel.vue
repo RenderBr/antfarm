@@ -8,6 +8,8 @@
       <li>Ants use nearby food, walls, trails, energy, and nest direction to decide what to do.</li>
       <li>Food grows colonies; successful ants shape the next generation.</li>
       <li><b class="text-[var(--color-text)] font-semibold">Smart</b> ranks brains by how varied their action signals are — richer, more diverse brain activity scores higher.</li>
+      <li>Eight <b class="text-[var(--color-text)] font-semibold">food types</b> (apple, blueberry, grape, strawberry, mushroom, banana, cherry, acorn) each give a different effect — boosts to smarts, max HP, HP regen, energy, or a poison debuff.</li>
+      <li>Each ant's <b class="text-[var(--color-text)] font-semibold">appearance</b> (segments, legs, antennae, color pattern) is shaped by its traits and a hash of its brain genome, so the look evolves with the mind.</li>
     </ul>
   </details>
 </template>
